@@ -3,6 +3,7 @@ import { runDeterministicRules } from "../rules/engine";
 import { runAiChecks } from "../ai/orchestrator";
 import { mergeFindings } from "../findings/merge";
 import { aiEnabled } from "../ai/client";
+import { convertPptxToImages } from "../pptx/convert";
 import { AnalyzeResult, AnalyzeSlide, AnalyzeSummary } from "./types";
 import { Finding, Severity } from "../rules/types";
 
@@ -14,14 +15,23 @@ export async function analyzePptx(
 
   const { findings: deterministic, ctx } = runDeterministicRules(deck);
 
-  let aiFindings: Finding[] = [];
-  try {
-    aiFindings = await runAiChecks(deck, ctx.aggregates);
-  } catch (err) {
-    console.error("AI checks failed; continuing with deterministic only:", err);
-  }
+  // Parse + high-fidelity image rendering run in parallel: the deck parse
+  // powers findings/overlays while the cloud renderer produces exact slides.
+  const [aiFindings, slideImages] = await Promise.all([
+    runAiChecks(deck, ctx.aggregates).catch((err) => {
+      console.error("AI checks failed; continuing with deterministic only:", err);
+      return [] as Finding[];
+    }),
+    convertPptxToImages(data, fileName).catch((err) => {
+      console.error("Slide image rendering failed; falling back to HTML:", err);
+      return null;
+    }),
+  ]);
 
   const merged = mergeFindings([...deterministic, ...aiFindings]);
+
+  const imageByIndex = new Map<number, string>();
+  for (const img of slideImages ?? []) imageByIndex.set(img.index, img.dataUrl);
 
   const slides: AnalyzeSlide[] = deck.slides.map((s) => ({
     index: s.index,
@@ -29,6 +39,7 @@ export async function analyzePptx(
     size: s.size,
     shapes: s.shapes,
     findings: merged.filter((f) => f.slideIndex === s.index),
+    imageUrl: imageByIndex.get(s.index) ?? null,
   }));
 
   const summary = summarize(merged);

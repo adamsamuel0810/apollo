@@ -33,14 +33,34 @@ export interface Paragraph {
   text: string; // concatenated run text
   bulletChar: string | null; // resolved bullet glyph, or null if buNone
   bulletType: "char" | "none" | "auto" | null;
+  /** Typeface declared for the bullet glyph (e.g. Wingdings), if any. */
+  bulletFont: string | null;
   align: string | null; // l/ctr/r/just
-  indentIn: number | null; // marL converted to inches
+  /** Left margin (marL) in inches. */
+  marginLeftIn: number | null;
+  /** First-line / hanging indent in inches (negative = hanging bullet). */
+  firstLineIndentIn: number | null;
+  /** @deprecated use marginLeftIn */
+  indentIn: number | null;
   spaceBeforePt: number | null;
   spaceAfterPt: number | null;
   lineSpacingPct: number | null; // 100 = single
 }
 
 export type ShapeKind = "text" | "table" | "picture" | "chart" | "group" | "other";
+
+/** Text-frame properties from <a:bodyPr> (vertical anchor + internal insets). */
+export interface BodyProps {
+  /** Vertical anchor: "t" (top), "ctr" (middle), "b" (bottom). */
+  anchor: "t" | "ctr" | "b";
+  /** Internal text insets in EMU. */
+  lIns: number;
+  tIns: number;
+  rIns: number;
+  bIns: number;
+  /** Word wrap: "square" (wrap) or "none". */
+  wrap: "square" | "none";
+}
 
 export interface TableCell {
   text: string;
@@ -76,6 +96,8 @@ export interface Shape {
   rect: Rect | null;
   paragraphs: Paragraph[];
   text: string; // all text in shape
+  /** Text-frame anchor/insets, used for faithful vertical alignment + padding. */
+  bodyPr: BodyProps | null;
   table: TableModel | null;
   /** For pictures: a data URL the client can render. */
   imageDataUrl: string | null;

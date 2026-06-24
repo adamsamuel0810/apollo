@@ -33,6 +33,7 @@ import {
   MasterPlaceholder,
   ShapeKind,
   SlideKind,
+  BodyProps,
 } from "./types";
 import { EMU_PER_INCH } from "../brand/guidelines";
 
@@ -44,6 +45,7 @@ interface PlaceholderStyle {
   idx: string | null;
   rect: Rect | null;
   lstStyle: XmlNode | undefined;
+  bodyPr: Partial<BodyProps> | null;
 }
 
 interface ParsedMaster {
@@ -212,32 +214,33 @@ function resolveParagraph(
     bulletChar: null,
     bulletType: null,
     align: attr(pPr, "algn") || null,
+    marginLeftIn: null,
+    firstLineIndentIn: null,
     indentIn: null,
     spaceBeforePt: null,
     spaceAfterPt: null,
     lineSpacingPct: null,
+    bulletFont: null,
   };
 
-  const marL = attr(pPr, "marL");
-  if (marL != null) para.indentIn = emuToInches(parseInt(marL, 10));
-
+  applyParaIndent(pPr, para);
   applyParaSpacing(pPr, para);
   applyBullet(pPr, para);
 
-  // Cascade for any unset paragraph props from level pPr in the style chain.
+  // Cascade from lstStyle / master txStyles (titleStyle, bodyStyle, otherStyle).
   for (const ls of styleChain) {
     const lvlPPr = levelPPr(ls, level);
     if (!lvlPPr) continue;
     if (para.align == null) para.align = attr(lvlPPr, "algn") || null;
-    if (para.indentIn == null) {
-      const m = attr(lvlPPr, "marL");
-      if (m != null) para.indentIn = emuToInches(parseInt(m, 10));
-    }
+    applyParaIndent(lvlPPr, para);
     if (para.spaceBeforePt == null || para.spaceAfterPt == null || para.lineSpacingPct == null) {
       applyParaSpacing(lvlPPr, para);
     }
     if (para.bulletType == null) applyBullet(lvlPPr, para);
   }
+
+  // Keep legacy field in sync for any older consumers.
+  if (para.indentIn == null) para.indentIn = para.marginLeftIn;
 
   return para;
 }
@@ -246,6 +249,18 @@ function levelPPr(lstStyle: XmlNode | undefined, level: number): XmlNode | undef
   if (!lstStyle) return undefined;
   const tag = level === 0 ? A("lvl1pPr") : A(`lvl${level + 1}pPr`);
   return child(lstStyle, tag) || (level === 0 ? child(lstStyle, A("defPPr")) : undefined);
+}
+
+function applyParaIndent(pPr: XmlNode | undefined, para: Paragraph) {
+  if (!pPr) return;
+  const marL = attr(pPr, "marL");
+  if (marL != null && para.marginLeftIn == null) {
+    para.marginLeftIn = emuToInches(parseInt(marL, 10));
+  }
+  const indent = attr(pPr, "indent");
+  if (indent != null && para.firstLineIndentIn == null) {
+    para.firstLineIndentIn = emuToInches(parseInt(indent, 10));
+  }
 }
 
 function applyParaSpacing(pPr: XmlNode | undefined, para: Paragraph) {
@@ -274,10 +289,77 @@ function applyBullet(pPr: XmlNode | undefined, para: Paragraph) {
     para.bulletChar = null;
   } else if (child(pPr, A("buChar"))) {
     para.bulletType = "char";
-    para.bulletChar = attr(child(pPr, A("buChar")), "char") || null;
+    const bu = child(pPr, A("buChar"));
+    para.bulletChar = attr(bu, "char") || null;
+    // buFont names the symbol font the char is encoded in (e.g. Wingdings).
+    // buFontTx means "use the run/text font" (no special symbol font).
+    const buFont = child(pPr, A("buFont"));
+    if (buFont) para.bulletFont = attr(buFont, "typeface") || null;
   } else if (child(pPr, A("buAutoNum"))) {
     para.bulletType = "auto";
+    para.bulletChar = null;
   }
+}
+
+/** Copy resolved bullet/margin style across sibling paragraphs in a list. */
+function harmonizeBulletParagraphs(paragraphs: Paragraph[]) {
+  const template = paragraphs.find(
+    (p) => (p.bulletType === "char" || p.bulletType === "auto") && p.text.trim()
+  );
+  if (!template) return;
+  for (const p of paragraphs) {
+    if (p.bulletType != null || !p.text.trim()) continue;
+    p.bulletType = template.bulletType;
+    p.bulletChar = template.bulletChar;
+    p.bulletFont = template.bulletFont;
+    if (p.marginLeftIn == null) p.marginLeftIn = template.marginLeftIn;
+    if (p.firstLineIndentIn == null) p.firstLineIndentIn = template.firstLineIndentIn;
+    if (p.indentIn == null) p.indentIn = p.marginLeftIn;
+  }
+}
+
+// Default text-frame insets in EMU (PowerPoint defaults).
+const DEFAULT_BODY_PR: BodyProps = {
+  anchor: "t",
+  lIns: 91440,
+  tIns: 45720,
+  rIns: 91440,
+  bIns: 45720,
+  wrap: "square",
+};
+
+function parseBodyPrPartial(txBody: XmlNode | undefined): Partial<BodyProps> | null {
+  if (!txBody) return null;
+  const bodyPr = child(txBody, A("bodyPr"));
+  if (!bodyPr) return null;
+  const out: Partial<BodyProps> = {};
+  const anchor = attr(bodyPr, "anchor");
+  if (anchor === "t" || anchor === "ctr" || anchor === "b") out.anchor = anchor;
+  const lIns = attr(bodyPr, "lIns");
+  if (lIns != null) out.lIns = parseInt(lIns, 10);
+  const tIns = attr(bodyPr, "tIns");
+  if (tIns != null) out.tIns = parseInt(tIns, 10);
+  const rIns = attr(bodyPr, "rIns");
+  if (rIns != null) out.rIns = parseInt(rIns, 10);
+  const bIns = attr(bodyPr, "bIns");
+  if (bIns != null) out.bIns = parseInt(bIns, 10);
+  const wrap = attr(bodyPr, "wrap");
+  if (wrap === "square" || wrap === "none") out.wrap = wrap;
+  return out;
+}
+
+/** Merge bodyPr from shape over placeholder defaults, then PowerPoint defaults. */
+function resolveBodyPr(
+  shapeBody: Partial<BodyProps> | null,
+  layoutPh: Partial<BodyProps> | null | undefined,
+  masterPh: Partial<BodyProps> | null | undefined
+): BodyProps {
+  return {
+    ...DEFAULT_BODY_PR,
+    ...(masterPh || {}),
+    ...(layoutPh || {}),
+    ...(shapeBody || {}),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -364,8 +446,17 @@ async function parseSpShape(
     for (const p of childrenNamed(txBody, A("p"))) {
       paragraphs.push(resolveParagraph(p, styleChain, ctx.theme));
     }
+    if (phType === "body" || phType == null) {
+      harmonizeBulletParagraphs(paragraphs);
+    }
   }
   const text = paragraphs.map((p) => p.text).join("\n");
+
+  const bodyPr = resolveBodyPr(
+    parseBodyPrPartial(txBody),
+    layoutPh?.bodyPr,
+    masterPh?.bodyPr
+  );
 
   return {
     id,
@@ -376,6 +467,7 @@ async function parseSpShape(
     rect,
     paragraphs,
     text,
+    bodyPr,
     table: null,
     imageDataUrl: null,
     fill: solidFillColor(spPr),
@@ -477,6 +569,7 @@ async function parseTableShape(
     rect,
     paragraphs: [],
     text: rows.map((r) => r.map((c) => c.text).join("\t")).join("\n"),
+    bodyPr: null,
     table,
     imageDataUrl: null,
     fill: null,
@@ -587,6 +680,7 @@ async function parsePicShape(
     rect,
     paragraphs: [],
     text: "",
+    bodyPr: null,
     table: null,
     imageDataUrl,
     fill: null,
@@ -607,6 +701,7 @@ function parseChartShape(gf: XmlNode, transform: Transform): Shape {
     rect,
     paragraphs: [],
     text: "",
+    bodyPr: null,
     table: null,
     imageDataUrl: null,
     fill: null,
@@ -662,6 +757,7 @@ function parsePlaceholders(spTree: XmlNode): PlaceholderStyle[] {
       idx,
       rect: readXfrm(spPr),
       lstStyle: lstStyleOf(txBody),
+      bodyPr: parseBodyPrPartial(txBody),
     });
   }
   return out;

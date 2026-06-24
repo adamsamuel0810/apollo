@@ -5,8 +5,13 @@ import { Shape, Paragraph, Rect } from "@/lib/pptx/types";
 import { Finding } from "@/lib/rules/types";
 import { AnalyzeSlide } from "@/lib/analyze/types";
 import { cn } from "@/lib/utils";
-
-const EMU_PER_POINT = 12700;
+import {
+  bulletDisplay,
+  bodyFrameStyle,
+  cssFontFamily,
+  paragraphLayoutStyle,
+  ptToPx,
+} from "@/lib/pptx/textRender";
 
 interface Props {
   slide: AnalyzeSlide;
@@ -55,9 +60,20 @@ export default function SlideCanvas({
       className="relative w-full overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm"
       style={{ height: heightPx }}
     >
-      {slide.shapes.map((s, i) => (
-        <ShapeView key={s.id || i} shape={s} pxPerEmu={pxPerEmu} />
-      ))}
+      {slide.imageUrl ? (
+        // Pixel-identical slide from the cloud renderer.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={slide.imageUrl}
+          alt={`Slide ${slide.index}`}
+          className="absolute inset-0 h-full w-full select-none"
+          draggable={false}
+        />
+      ) : (
+        slide.shapes.map((s, i) => (
+          <ShapeView key={s.id || i} shape={s} pxPerEmu={pxPerEmu} />
+        ))
+      )}
 
       {/* Highlight overlays */}
       {findings.map((f, idx) => {
@@ -143,12 +159,22 @@ function ShapeView({ shape, pxPerEmu }: { shape: Shape; pxPerEmu: number }) {
 
   // Text / shape-with-fill
   const bg = shape.fill ? `#${shape.fill}` : undefined;
+  const frame = bodyFrameStyle(shape.bodyPr, pxPerEmu);
   return (
     <div
       className="absolute overflow-hidden"
       style={{ ...style, backgroundColor: bg }}
     >
-      <div className="flex h-full w-full flex-col justify-center px-1">
+      <div
+        className="flex h-full w-full flex-col"
+        style={{
+          justifyContent: frame.justifyContent,
+          paddingTop: frame.paddingTop,
+          paddingRight: frame.paddingRight,
+          paddingBottom: frame.paddingBottom,
+          paddingLeft: frame.paddingLeft,
+        }}
+      >
         {shape.paragraphs.map((p, i) => (
           <ParagraphView key={i} para={p} pxPerEmu={pxPerEmu} />
         ))}
@@ -158,33 +184,46 @@ function ShapeView({ shape, pxPerEmu }: { shape: Shape; pxPerEmu: number }) {
 }
 
 function ParagraphView({ para, pxPerEmu }: { para: Paragraph; pxPerEmu: number }) {
-  const align =
-    para.align === "ctr"
-      ? "center"
-      : para.align === "r"
-        ? "right"
-        : para.align === "just"
-          ? "justify"
-          : "left";
-  const indentPx = (para.indentIn || 0) * 914400 * pxPerEmu;
-  const bullet = bulletPrefix(para);
+  const layout = paragraphLayoutStyle(para, pxPerEmu);
+  const bullet = bulletDisplay(para);
+  const defaultSizePt = para.runs.find((r) => r.sizePt)?.sizePt ?? 16;
+
+  // Hanging indent: PowerPoint uses negative firstLineIndent for bullet glyphs.
+  const hangPx =
+    bullet != null
+      ? layout.textIndentPx < 0
+        ? -layout.textIndentPx
+        : Math.max(ptToPx(defaultSizePt, pxPerEmu) * 0.38, 6)
+      : 0;
+  const padLeft = layout.marginLeftPx + (bullet ? hangPx : 0);
 
   return (
     <p
       style={{
-        textAlign: align as React.CSSProperties["textAlign"],
-        paddingLeft: indentPx,
-        margin: 0,
-        lineHeight: 1.1,
+        textAlign: layout.textAlign,
+        margin: `${layout.marginTopPx}px 0 ${layout.marginBottomPx}px 0`,
+        paddingLeft: padLeft,
+        textIndent: bullet ? -hangPx : layout.textIndentPx,
+        lineHeight: layout.lineHeight,
       }}
     >
-      {bullet && <span className="mr-1 text-slate-500">{bullet}</span>}
+      {bullet && (
+        <span
+          style={{
+            fontFamily: bullet.fontFamily,
+            fontWeight: 400,
+            marginRight: hangPx * 0.15,
+          }}
+        >
+          {bullet.char}
+        </span>
+      )}
       {para.runs
         .filter((r) => r.text !== "\n")
         .map((run, i) => {
           const sizePx = run.sizePt
-            ? run.sizePt * EMU_PER_POINT * pxPerEmu
-            : 12 * EMU_PER_POINT * pxPerEmu;
+            ? ptToPx(run.sizePt, pxPerEmu)
+            : ptToPx(defaultSizePt, pxPerEmu);
           return (
             <span
               key={i}
@@ -197,7 +236,7 @@ function ParagraphView({ para, pxPerEmu }: { para: Paragraph; pxPerEmu: number }
                   : run.strike
                     ? "line-through"
                     : "none",
-                fontFamily: `${run.font || "Calibri"}, "Segoe UI", system-ui, sans-serif`,
+                fontFamily: cssFontFamily(run.font),
                 color: run.color ? `#${run.color}` : "#1a1a1a",
                 whiteSpace: "pre-wrap",
               }}
@@ -208,13 +247,6 @@ function ParagraphView({ para, pxPerEmu }: { para: Paragraph; pxPerEmu: number }
         })}
     </p>
   );
-}
-
-function bulletPrefix(para: Paragraph): string {
-  if (para.bulletType === "none" || para.bulletType == null) return "";
-  if (para.bulletType === "char" && para.bulletChar) return para.bulletChar;
-  if (para.bulletType === "auto") return "•";
-  return "";
 }
 
 function TableView({
@@ -240,8 +272,8 @@ function TableView({
                 if (cell.hMerge || cell.vMerge) return null;
                 const run = cell.runs.find((r) => r.text.trim());
                 const sizePx = run?.sizePt
-                  ? run.sizePt * EMU_PER_POINT * pxPerEmu
-                  : 9 * EMU_PER_POINT * pxPerEmu;
+                  ? ptToPx(run.sizePt, pxPerEmu)
+                  : ptToPx(10, pxPerEmu);
                 return (
                   <td
                     key={ci}
@@ -255,6 +287,7 @@ function TableView({
                       borderRight: cell.borders.right ? "1px solid #000" : "none",
                       fontSize: sizePx,
                       fontWeight: run?.bold ? 700 : 400,
+                      fontStyle: run?.italic ? "italic" : "normal",
                       color: run?.color ? `#${run.color}` : "#1a1a1a",
                       textAlign:
                         (cell.align === "ctr"
@@ -263,9 +296,10 @@ function TableView({
                             ? "right"
                             : "left") as React.CSSProperties["textAlign"],
                       padding: "1px 3px",
-                      fontFamily: `Calibri, "Segoe UI", system-ui, sans-serif`,
+                      fontFamily: cssFontFamily(run?.font ?? "Calibri"),
                       overflow: "hidden",
                       whiteSpace: "nowrap",
+                      lineHeight: 1.15,
                     }}
                   >
                     {cell.text}

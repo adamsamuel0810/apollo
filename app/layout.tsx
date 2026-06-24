@@ -1,5 +1,14 @@
 import type { Metadata } from "next";
+import { Carlito } from "next/font/google";
 import "./globals.css";
+
+const carlito = Carlito({
+  weight: ["400", "700"],
+  style: ["normal", "italic"],
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--slide-font-family",
+});
 
 export const metadata: Metadata = {
   title: "ACME Brand Compliance Checker",
@@ -14,7 +23,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className={carlito.variable}>{children}</body>
     </html>
   );
 }

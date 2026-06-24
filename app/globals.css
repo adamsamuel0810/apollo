@@ -5,6 +5,7 @@
 :root {
   --background: 210 20% 98%;
   --foreground: 222 47% 11%;
+  --slide-font-family: "Carlito", Calibri, "Segoe UI", system-ui, sans-serif;
 }
 
 html,

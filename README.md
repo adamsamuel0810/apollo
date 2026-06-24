@@ -56,12 +56,23 @@ slide → severity → confidence. The UI shows **errors/warnings at or above a 
 threshold** by default; a single toggle reveals the low-confidence / `info` tier. This
 is the core of the "tight control over noise" requirement.
 
-### Rendering without LibreOffice
-Vercel's serverless runtime can't run LibreOffice/PowerPoint, so slides are
-**re-rendered from the parsed geometry**: absolutely-positioned shapes, native HTML
-tables with real cell fills/borders, embedded images as data URLs, and labeled
-placeholders for native charts. Because the highlight overlays use the *same* EMU
-geometry as the rules, the boxes map exactly onto the flagged elements.
+### Slide rendering (two modes)
+The app supports two rendering modes; the highlight overlays use the *same* EMU
+geometry as the rules in both, so the boxes map exactly onto the flagged elements.
+
+1. **Exact image mode (recommended).** When `CONVERTAPI_TOKEN` (or
+   `CONVERTAPI_SECRET`) is set, each slide is rasterized to a pixel-identical PNG
+   via [ConvertAPI](https://www.convertapi.com/) (PPTX → PNG) and shown as the
+   slide background. This looks exactly like PowerPoint. Conversion runs
+   in-memory (`StoreFile=false`) so decks aren't persisted by the provider.
+2. **HTML fallback (zero-config, fully private).** With no key configured, slides
+   are re-rendered from parsed geometry — absolutely-positioned shapes, native
+   HTML tables with real fills/borders, embedded images, and chart placeholders.
+   Free and private, but not pixel-perfect (Vercel serverless can't run
+   LibreOffice/PowerPoint, which is why exact mode is offloaded to an API).
+
+The pipeline degrades gracefully: if the conversion API fails or times out, it
+automatically falls back to the HTML renderer.
 
 ---
 

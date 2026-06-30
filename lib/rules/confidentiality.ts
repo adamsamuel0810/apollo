@@ -19,6 +19,7 @@ export function confidentialityRule(slide: Slide, ctx: RuleContext): Finding[] {
   const withText = footers.filter((s) => s.text.trim().length > 0);
 
   if (withText.length === 0) {
+    const ftr = slide.shapes.find((s) => s.placeholderType === "ftr");
     findings.push({
       id: makeFindingId("confidentiality-missing", slide.index),
       ruleId: "confidentiality-missing",
@@ -34,6 +35,16 @@ export function confidentialityRule(slide: Slide, ctx: RuleContext): Finding[] {
         "Confidentiality Statement: Appears on every slide, including title and section header slides",
       source: "deterministic",
       rect: ctx.aggregates.footerRect,
+      shapeId: ftr?.id,
+      fix: ctx.aggregates.footerRect
+        ? {
+            kind: "ensure-footer",
+            slideIndex: slide.index,
+            shapeId: ftr?.id,
+            newText: ctx.aggregates.confidentialityText || "",
+            targetRect: ctx.aggregates.footerRect,
+          }
+        : undefined,
     });
     return findings;
   }
@@ -61,6 +72,12 @@ export function confidentialityRule(slide: Slide, ctx: RuleContext): Finding[] {
         source: "deterministic",
         shapeId: footer.id,
         rect: footer.rect,
+        fix: {
+          kind: "title-rewrite",
+          slideIndex: slide.index,
+          shapeId: footer.id,
+          newText: ctx.aggregates.confidentialityText || "",
+        },
       });
     }
   }
@@ -85,6 +102,14 @@ export function confidentialityRule(slide: Slide, ctx: RuleContext): Finding[] {
         source: "deterministic",
         shapeId: footer.id,
         rect: footer.rect,
+        fix: anchor
+          ? {
+              kind: "shape-reposition",
+              slideIndex: slide.index,
+              shapeId: footer.id,
+              targetRect: anchor,
+            }
+          : undefined,
       });
     }
   }

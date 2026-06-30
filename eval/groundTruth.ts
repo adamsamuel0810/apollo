@@ -26,7 +26,7 @@ export const GROUND_TRUTH: Record<number, GtTag[]> = {
     { tag: "legend-spacing", layer: "hard" },
     { tag: "legend-box", layer: "hard" },
     { tag: "first-col-margin", layer: "hard" },
-    { tag: "title-lines", layer: "ai" },
+    { tag: "title-lines", layer: "deterministic" },
   ],
   4: [
     { tag: "font-consistency", layer: "deterministic" },
@@ -41,7 +41,7 @@ export const GROUND_TRUTH: Record<number, GtTag[]> = {
     { tag: "merged-cells", layer: "deterministic" },
     { tag: "first-col-margin", layer: "hard" },
   ],
-  9: [{ tag: "title-lines", layer: "ai" }],
+  9: [{ tag: "title-lines", layer: "deterministic" }],
   10: [
     { tag: "confidentiality-missing", layer: "deterministic" },
     { tag: "legend-naming", layer: "ai" },
@@ -86,6 +86,8 @@ export const RULE_TO_TAG: Record<string, string> = {
   "confidentiality-moved": "confidentiality-moved",
   "confidentiality-overlap": "confidentiality-overlap",
   "title-moved": "title-moved",
+  "title-lines": "title-lines",
+  "title-punct": "title-punct",
 };
 
 // AI findings map by category to a representative tag for credit in eval.

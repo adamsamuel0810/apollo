@@ -1,5 +1,5 @@
 import { Slide, Shape } from "../pptx/types";
-import { Finding, RuleContext, makeFindingId, FindingCategory, Severity } from "./types";
+import { Finding, RuleContext, makeFindingId, FindingCategory, Severity, FixInstruction } from "./types";
 import { visibleRuns } from "./util";
 import { cellRect } from "../pptx/render";
 import { TABLE_COLORS } from "../brand/palette";
@@ -68,6 +68,35 @@ const HEADER_PATTERNS: TextPattern[] = [
   },
 ];
 
+function textReplaceFix(
+  slideIndex: number,
+  shapeId: string,
+  ruleId: string,
+  cell?: { row: number; col: number }
+): FixInstruction | undefined {
+  const map: Record<
+    string,
+    { search: string; replace: string; ci?: boolean; deckWide?: boolean }
+  > = {
+    "term-percentile": { search: "Percentile", replace: "%ile", ci: true, deckWide: true },
+    "term-tgt": { search: "TGT", replace: "Target", deckWide: true },
+    "term-incumbent": { search: "Incumbent", replace: "Executive", ci: true },
+    "term-company-name": { search: "Company Name", replace: "Company", ci: true },
+  };
+  const spec = map[ruleId];
+  if (!spec) return undefined;
+  return {
+    kind: spec.deckWide ? "deck-replace" : "text-replace",
+    slideIndex,
+    shapeId: spec.deckWide ? undefined : shapeId,
+    cell: spec.deckWide ? undefined : cell,
+    search: spec.search,
+    replace: spec.replace,
+    caseInsensitive: spec.ci,
+    deckWide: spec.deckWide,
+  };
+}
+
 export function terminologyRules(slide: Slide, _ctx: RuleContext): Finding[] {
   const findings: Finding[] = [];
 
@@ -104,6 +133,7 @@ function scanProse(shape: Shape, slideIndex: number, findings: Finding[]) {
           source: "deterministic",
           shapeId: shape.id,
           rect: shape.rect,
+          fix: textReplaceFix(slideIndex, shape.id, p.ruleId),
         });
       }
     }
@@ -146,6 +176,7 @@ function scanTable(shape: Shape, slideIndex: number, findings: Finding[]) {
             shapeId: shape.id,
             rect: cellRect(shape.rect, table, ri, ci) || shape.rect,
             cell: { row: ri, col: ci },
+            fix: textReplaceFix(slideIndex, shape.id, p.ruleId, { row: ri, col: ci }),
           });
         }
       }

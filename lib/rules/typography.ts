@@ -5,8 +5,12 @@ import {
   visibleRuns,
   endsWithPunctuation,
   titleText,
+  estimateLines,
+  emuToIn,
 } from "./util";
 import { TITLE, TYPEFACE, SIZE_TOLERANCE_PT } from "../brand/guidelines";
+
+const TRAILING_PUNCT = /[.,;]+$/;
 
 export function typographyRules(slide: Slide, _ctx: RuleContext): Finding[] {
   const findings: Finding[] = [];
@@ -33,6 +37,12 @@ export function typographyRules(slide: Slide, _ctx: RuleContext): Finding[] {
         source: "deterministic",
         shapeId: shape.id,
         rect: shape.rect,
+        fix: {
+          kind: "font-family-set",
+          slideIndex: slide.index,
+          shapeId: shape.id,
+          fontFamily: TYPEFACE,
+        },
       });
     }
   }
@@ -63,6 +73,12 @@ export function typographyRules(slide: Slide, _ctx: RuleContext): Finding[] {
         source: "deterministic",
         shapeId: title.id,
         rect: title.rect,
+        fix: {
+          kind: "font-size-set",
+          slideIndex: slide.index,
+          shapeId: title.id,
+          fontSizePt: TITLE.sizePt,
+        },
       });
     }
 
@@ -84,12 +100,18 @@ export function typographyRules(slide: Slide, _ctx: RuleContext): Finding[] {
           source: "deterministic",
           shapeId: title.id,
           rect: title.rect,
+          fix: {
+            kind: "font-bold-set",
+            slideIndex: slide.index,
+            shapeId: title.id,
+          },
         });
       }
     }
 
     // No ending punctuation.
     if (endsWithPunctuation(tText)) {
+      const trimmed = tText.trim().replace(TRAILING_PUNCT, "");
       findings.push({
         id: makeFindingId("title-punct", slide.index),
         ruleId: "title-punct",
@@ -105,10 +127,42 @@ export function typographyRules(slide: Slide, _ctx: RuleContext): Finding[] {
         source: "deterministic",
         shapeId: title.id,
         rect: title.rect,
+        fix: {
+          kind: "title-rewrite",
+          slideIndex: slide.index,
+          shapeId: title.id,
+          newText: trimmed,
+        },
       });
     }
-    // Headline length (> 3 lines) is handled by the AI layer, which can reason
-    // about rendered wrapping/autofit far more reliably than a text estimate.
+
+    // Headline length: flag when title exceeds 3 visual lines.
+    const boxWidthIn = title.rect ? emuToIn(title.rect.cx) : 8.5;
+    const lineCount = estimateLines(tText, TITLE.sizePt, boxWidthIn);
+    if (lineCount > TITLE.maxLines) {
+      findings.push({
+        id: makeFindingId("title-lines", slide.index),
+        ruleId: "title-lines",
+        category: "title",
+        severity: "warning",
+        confidence: 0.88,
+        slideIndex: slide.index,
+        title: `Slide title exceeds ${TITLE.maxLines} lines`,
+        detail: `The title wraps to approximately ${lineCount} lines; ACME headlines should stay within ${TITLE.maxLines} lines.`,
+        evidence: tText.slice(0, 80),
+        suggestion: `Shorten the title to ${TITLE.maxLines} lines while keeping the takeaway.`,
+        guideline: "Slide Title: Flag/warn if headline exceeds 3 lines",
+        source: "deterministic",
+        shapeId: title.id,
+        rect: title.rect,
+        fix: {
+          kind: "ai-rewrite",
+          slideIndex: slide.index,
+          shapeId: title.id,
+          aiContext: `Shorten to ${TITLE.maxLines} lines at 24pt in ${boxWidthIn.toFixed(1)}" box.`,
+        },
+      });
+    }
   }
 
   return findings;

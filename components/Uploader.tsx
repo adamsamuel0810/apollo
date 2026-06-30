@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { UploadCloud, FileText, Loader2, ShieldCheck } from "lucide-react";
+import { UploadCloud, FileText, Loader2, ShieldCheck, Wand2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AnalyzeResult } from "@/lib/analyze/types";
 
 interface Props {
-  onAnalyzed: (result: import("@/lib/analyze/types").AnalyzeResult) => void;
+  onAnalyzed: (result: AnalyzeResult, file: File) => void;
 }
 
 export default function Uploader({ onAnalyzed }: Props) {
@@ -32,8 +33,8 @@ export default function Uploader({ onAnalyzed }: Props) {
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error || `Analysis failed (${res.status})`);
         }
-        const result = await res.json();
-        onAnalyzed(result);
+        const result = (await res.json()) as AnalyzeResult;
+        onAnalyzed(result, file);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong.");
       } finally {
@@ -64,8 +65,8 @@ export default function Uploader({ onAnalyzed }: Props) {
           ACME Brand Compliance Checker
         </h1>
         <p className="mt-2 text-sm text-slate-500">
-          Upload a PowerPoint to automatically flag brand-guideline issues, then
-          review them slide by slide.
+          Upload a PowerPoint to flag brand issues, accept fixes to update the deck
+          automatically, and export the corrected file.
         </p>
       </div>
 
@@ -119,9 +120,9 @@ export default function Uploader({ onAnalyzed }: Props) {
         <p className="mt-4 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600">{error}</p>
       )}
 
-      <p className="mt-6 text-center text-xs text-slate-400">
-        Findings combine deterministic checks with AI review. You stay in control —
-        accept or reject each flag.
+      <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-xs text-slate-400">
+        <Wand2 className="h-3.5 w-3.5" />
+        Accept a flag to auto-fix the deck · Export corrected PPTX + fix report
       </p>
     </div>
   );

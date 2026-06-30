@@ -43,7 +43,7 @@ You review ONE slide at a time (with deck-wide context provided) and report only
 
 Focus ONLY on these checks:
 1. Bullet parallelism: bullets in the same list must share parallel grammatical structure. Flag a list that mixes structures (e.g., some bullets are noun phrases, others full sentences).
-2. Headline quality: the slide title should state the takeaway/insight, not just the topic. Flag topic-only titles. Also flag headlines that are clearly too long/dense (more than ~3 lines of content).
+2. Headline quality: the slide title should state the takeaway/insight, not just the topic. Flag topic-only titles. (Headline line count >3 is handled by deterministic code — do NOT flag length.)
 3. Client-name consistency: the deck's standard client name is provided. Flag any place that uses a different variant of the client's name (e.g., a longer/alternate form).
 4. Proper-noun punctuation: flag clear punctuation errors in names (e.g., a missing period in an abbreviation like "C.R Bard" which should be "C.R. Bard").
 5. Missing units/scale: flag numeric table columns (e.g., revenue, market cap) that lack a units/scale indicator (such as $MM or ($000s)) when the magnitude implies one is needed.

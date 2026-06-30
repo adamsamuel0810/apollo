@@ -1,5 +1,5 @@
 import { Shape, SlideKind } from "../pptx/types";
-import { Finding, Severity } from "../rules/types";
+import { Finding, Severity, FixRecord } from "../rules/types";
 
 export interface AnalyzeSlide {
   index: number;
@@ -27,4 +27,6 @@ export interface AnalyzeResult {
   aiEnabled: boolean;
   summary: AnalyzeSummary;
   slides: AnalyzeSlide[];
+  /** Fixes applied during this session (accumulated client-side). */
+  fixRecords?: FixRecord[];
 }

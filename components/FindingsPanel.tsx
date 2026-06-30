@@ -1,7 +1,7 @@
 "use client";
 
 import { Finding } from "@/lib/rules/types";
-import { Check, X, Sparkles, Cog, BookOpen, CornerDownRight, CircleCheck } from "lucide-react";
+import { Check, X, Sparkles, Cog, BookOpen, CornerDownRight, CircleCheck, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type Decision = "accepted" | "rejected";
@@ -11,8 +11,11 @@ interface Props {
   findings: Finding[]; // already in display order (matches canvas numbering)
   decisions: Record<string, Decision>;
   selectedId: string | null;
+  fixingId: string | null;
   onSelect: (id: string) => void;
   onDecision: (id: string, decision: Decision | null) => void;
+  onAcceptFix: (finding: Finding) => void;
+  onRejectFix: (finding: Finding) => void;
 }
 
 const SEV_STYLES: Record<string, { dot: string; chip: string; label: string }> = {
@@ -26,8 +29,11 @@ export default function FindingsPanel({
   findings,
   decisions,
   selectedId,
+  fixingId,
   onSelect,
   onDecision,
+  onAcceptFix,
+  onRejectFix,
 }: Props) {
   if (findings.length === 0) {
     return (
@@ -120,22 +126,40 @@ export default function FindingsPanel({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onDecision(f.id, decision === "accepted" ? null : "accepted");
+                      if (decision === "accepted") {
+                        onDecision(f.id, null);
+                      } else {
+                        onAcceptFix(f);
+                      }
                     }}
+                    disabled={fixingId === f.id}
                     className={cn(
                       "flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition",
                       decision === "accepted"
                         ? "bg-emerald-600 text-white"
-                        : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                        : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+                      fixingId === f.id && "opacity-70"
                     )}
                   >
-                    <Check className="h-3.5 w-3.5" />
-                    {decision === "accepted" ? "Accepted" : "Accept"}
+                    {fixingId === f.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5" />
+                    )}
+                    {fixingId === f.id
+                      ? "Applying…"
+                      : decision === "accepted"
+                        ? "Accepted"
+                        : "Accept"}
                   </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onDecision(f.id, decision === "rejected" ? null : "rejected");
+                      if (decision === "rejected") {
+                        onDecision(f.id, null);
+                      } else {
+                        onRejectFix(f);
+                      }
                     }}
                     className={cn(
                       "flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition",

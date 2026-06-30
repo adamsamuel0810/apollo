@@ -9,23 +9,26 @@ import { Finding, Severity } from "../rules/types";
 
 export async function analyzePptx(
   data: Buffer | ArrayBuffer | Uint8Array,
-  fileName: string
+  fileName: string,
+  options: { skipImages?: boolean; skipAi?: boolean } = {}
 ): Promise<AnalyzeResult> {
   const deck = await parseDeck(data);
 
   const { findings: deterministic, ctx } = runDeterministicRules(deck);
 
-  // Parse + high-fidelity image rendering run in parallel: the deck parse
-  // powers findings/overlays while the cloud renderer produces exact slides.
   const [aiFindings, slideImages] = await Promise.all([
-    runAiChecks(deck, ctx.aggregates).catch((err) => {
-      console.error("AI checks failed; continuing with deterministic only:", err);
-      return [] as Finding[];
-    }),
-    convertPptxToImages(data, fileName).catch((err) => {
-      console.error("Slide image rendering failed; falling back to HTML:", err);
-      return null;
-    }),
+    options.skipAi
+      ? Promise.resolve([] as Finding[])
+      : runAiChecks(deck, ctx.aggregates).catch((err) => {
+          console.error("AI checks failed; continuing with deterministic only:", err);
+          return [] as Finding[];
+        }),
+    options.skipImages
+      ? Promise.resolve(null)
+      : convertPptxToImages(data, fileName).catch((err) => {
+          console.error("Slide image rendering failed; falling back to HTML:", err);
+          return null;
+        }),
   ]);
 
   const merged = mergeFindings([...deterministic, ...aiFindings]);

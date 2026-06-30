@@ -74,6 +74,22 @@ geometry as the rules in both, so the boxes map exactly onto the flagged element
 The pipeline degrades gracefully: if the conversion API fails or times out, it
 automatically falls back to the HTML renderer.
 
+### Auto-fix and export
+Many findings include an **auto-fix** action. Click **Accept & Fix** on a flag to
+patch the underlying PPTX immediately (terminology replacements, title punctuation,
+AI title shortening for >3-line headlines, etc.). The slide preview re-renders after
+each fix.
+
+- **Auto-fix all** — applies every fixable deterministic + AI rule in one pass.
+- **Export → Updated PPTX** — downloads the current deck with all accepted/auto fixes.
+- **Export → Fix report (JSON)** — audit log of every change (`before` / `after`).
+- **Export → Review decisions (JSON)** — accepted/rejected flags for QA.
+
+Fixable rules today: `term-percentile`, `term-tgt`, `term-incumbent`,
+`term-company-name`, `title-punct`, `title-lines` (AI rewrite). Layout/placement
+issues (e.g. title moved, merged cells) are flagged but not auto-fixed — those
+require manual adjustment in PowerPoint.
+
 ---
 
 ## Tech stack

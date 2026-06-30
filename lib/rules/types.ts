@@ -41,6 +41,67 @@ export interface Finding {
   rect?: Rect | null;
   /** Optional table cell location for highlight + context. */
   cell?: { row: number; col: number };
+  /** Machine-applicable fix metadata; present when Accept can auto-apply. */
+  fix?: FixInstruction;
+}
+
+/** Describes how to apply an automatic fix to the underlying PPTX. */
+export type FixKind =
+  | "text-replace"
+  | "title-rewrite"
+  | "ai-rewrite"
+  | "deck-replace"
+  | "font-family-set"
+  | "font-size-set"
+  | "font-bold-set"
+  | "color-set"
+  | "shape-reposition"
+  | "row-fill-set"
+  | "border-remove"
+  | "ensure-footer";
+
+export interface FixInstruction {
+  kind: FixKind;
+  slideIndex: number;
+  shapeId?: string;
+  cell?: { row: number; col: number };
+  /** For text-replace fixes. */
+  search?: string;
+  replace?: string;
+  caseInsensitive?: boolean;
+  /** When true, `search` is a regex pattern (not escaped). */
+  regex?: boolean;
+  /** When true, apply text-replace across every slide in the deck. */
+  deckWide?: boolean;
+  /** For title-rewrite / ai-rewrite fixes. */
+  newText?: string;
+  /** Extra context for AI-driven rewrites. */
+  aiContext?: string;
+  /** font-family-set / font-size-set */
+  fontFamily?: string;
+  fontSizePt?: number;
+  /** color-set */
+  fromColor?: string;
+  toColor?: string;
+  colorTarget?: "fill" | "text" | "both";
+  /** shape-reposition (EMU) */
+  targetRect?: import("../pptx/types").Rect;
+  /** row-fill-set */
+  rowIndex?: number;
+  fillColor?: string;
+  /** border-remove */
+  borderScope?: "table-sides";
+}
+
+export interface FixRecord {
+  findingId: string;
+  ruleId: string;
+  slideIndex: number;
+  title: string;
+  before: string;
+  after: string;
+  appliedAt: string;
+  source: FindingSource;
 }
 
 export interface RuleContext {

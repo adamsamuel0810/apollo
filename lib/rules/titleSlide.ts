@@ -29,6 +29,15 @@ export function draftDesignatorRule(slide: Slide, _ctx: RuleContext): Finding[] 
           source: "deterministic",
           shapeId: shape.id,
           rect: shape.rect,
+          fix: {
+            kind: "text-replace",
+            slideIndex: slide.index,
+            shapeId: shape.id,
+            search: `\\b${m[1]}\\b\\s*`,
+            replace: "",
+            regex: true,
+            caseInsensitive: true,
+          },
         });
         break;
       }

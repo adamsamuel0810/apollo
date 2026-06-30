@@ -85,6 +85,13 @@ function fontConsistency(
       shapeId: shape.id,
       rect: cellRect(shape.rect, table, s.row, s.col) || shape.rect,
       cell: { row: s.row, col: s.col },
+      fix: {
+        kind: "font-size-set",
+        slideIndex,
+        shapeId: shape.id,
+        cell: { row: s.row, col: s.col },
+        fontSizePt: dominant,
+      },
     });
   }
 }
@@ -118,6 +125,12 @@ function sideBorders(
       source: "deterministic",
       shapeId: shape.id,
       rect: shape.rect,
+      fix: {
+        kind: "border-remove",
+        slideIndex,
+        shapeId: shape.id,
+        borderScope: "table-sides",
+      },
     });
   }
 }
@@ -177,6 +190,13 @@ function statsRowColor(
       shapeId: shape.id,
       rect: cellRect(shape.rect, table, ri, label.col) || shape.rect,
       cell: { row: ri, col: label.col },
+      fix: {
+        kind: "row-fill-set",
+        slideIndex,
+        shapeId: shape.id,
+        rowIndex: ri,
+        fillColor: TABLE_COLORS.statsRow,
+      },
     });
   }
 }

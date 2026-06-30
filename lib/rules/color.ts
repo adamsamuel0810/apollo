@@ -8,13 +8,28 @@ const MAX_PER_SLIDE = 4;
 const TOLERANCE = 8;
 
 export function colorRules(slide: Slide, _ctx: RuleContext): Finding[] {
-  const found = new Map<string, { shape: Shape; rect: Rect | null; where: string }>();
+  const found = new Map<
+    string,
+    {
+      shape: Shape;
+      rect: Rect | null;
+      where: string;
+      cell?: { row: number; col: number };
+    }
+  >();
 
-  const consider = (hex: string | null, shape: Shape, rect: Rect | null, where: string) => {
+  const consider = (
+    hex: string | null,
+    shape: Shape,
+    rect: Rect | null,
+    where: string,
+    cell?: { row: number; col: number }
+  ) => {
     const h = normalizeHex(hex);
     if (!h) return;
     if (isOnPalette(h, TOLERANCE)) return;
-    if (!found.has(h)) found.set(h, { shape, rect, where });
+    const key = cell ? `${h}:${cell.row}:${cell.col}` : h;
+    if (!found.has(key)) found.set(key, { shape, rect, where, cell });
   };
 
   for (const shape of slide.shapes) {
@@ -32,8 +47,9 @@ export function colorRules(slide: Slide, _ctx: RuleContext): Finding[] {
         for (let ci = 0; ci < shape.table.rows[ri].length; ci++) {
           const cell = shape.table.rows[ri][ci];
           const rect = cellRect(shape.rect, shape.table, ri, ci) || shape.rect;
-          consider(cell.fill, shape, rect, `cell fill`);
-          for (const r of cell.runs) if (r.text.trim()) consider(r.color, shape, rect, `cell text`);
+          consider(cell.fill, shape, rect, `cell fill`, { row: ri, col: ci });
+          for (const r of cell.runs)
+            if (r.text.trim()) consider(r.color, shape, rect, `cell text`, { row: ri, col: ci });
         }
       }
     }
@@ -45,6 +61,7 @@ export function colorRules(slide: Slide, _ctx: RuleContext): Finding[] {
     if (n >= MAX_PER_SLIDE) break;
     n++;
     const near = nearestPaletteColor(hex);
+    const isFill = info.where.toLowerCase().includes("fill");
     findings.push({
       id: makeFindingId("off-palette-color", slide.index),
       ruleId: "off-palette-color",
@@ -64,6 +81,18 @@ export function colorRules(slide: Slide, _ctx: RuleContext): Finding[] {
       source: "deterministic",
       shapeId: info.shape.id,
       rect: info.rect,
+      cell: info.cell,
+      fix: near
+        ? {
+            kind: "color-set",
+            slideIndex: slide.index,
+            shapeId: info.shape.id,
+            fromColor: hex,
+            toColor: near.color,
+            colorTarget: isFill ? "fill" : "text",
+            cell: info.cell,
+          }
+        : undefined,
     });
   }
   return findings;

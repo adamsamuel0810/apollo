@@ -20,7 +20,10 @@ export function mergeFindings(findings: Finding[]): Finding[] {
       collapsed.push(f);
       continue;
     }
-    const key = `${f.slideIndex}:${f.ruleId}`;
+    const key =
+      f.shapeId != null || f.cell != null
+        ? `${f.slideIndex}:${f.ruleId}:${f.shapeId ?? ""}:${f.cell?.row ?? ""}:${f.cell?.col ?? ""}`
+        : `${f.slideIndex}:${f.ruleId}`;
     const existing = byRule.get(key);
     if (!existing) {
       byRule.set(key, { ...f });

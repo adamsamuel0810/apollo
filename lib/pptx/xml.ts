@@ -99,6 +99,20 @@ export function allText(node: XmlNode): string {
   return out;
 }
 
+/** Serialize a preserveOrder document back to XML. */
+export function buildXml(nodes: XmlNode[]): string {
+  // Lazy import keeps parser bundle split; writer is server-only.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { XMLBuilder } = require("fast-xml-parser") as typeof import("fast-xml-parser");
+  const builder = new XMLBuilder({
+    ignoreAttributes: false,
+    attributeNamePrefix: "@_",
+    preserveOrder: true,
+    suppressEmptyNode: true,
+  });
+  return builder.build(nodes);
+}
+
 /** Walk to the document root element (first non-meta node). */
 export function root(nodes: XmlNode[], name: string): XmlNode | undefined {
   for (const n of nodes) {

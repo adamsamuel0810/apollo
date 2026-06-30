@@ -11,7 +11,7 @@ export function getAnthropic(): Anthropic | null {
 }
 
 export function getModel(): string {
-  return process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest";
+  return process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
 }
 
 export function aiEnabled(): boolean {
